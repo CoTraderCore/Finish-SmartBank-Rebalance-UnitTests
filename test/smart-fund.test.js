@@ -167,16 +167,21 @@ contract('SmartFund', function(accounts) {
       await smartFund.setWhitelistOnly(true)
       await smartFund.setWhitelistAddress(user1, true)
       await smartFund.deposit({ from: user1, value: 100 })
+
       await util.expectThrow(smartFund.deposit({ from: user2, value: 100 }))
       await smartFund.setWhitelistAddress(user2, true)
       await smartFund.deposit({ from: user2, value: 100 })
+
       eq(await smartBank.addressToShares.call(user1), DECIMALS)
       eq(await smartBank.addressToShares.call(user2), DECIMALS)
+
       await smartFund.setWhitelistAddress(user1, false)
       await util.expectThrow(smartFund.deposit({ from: user1, value: 100 }))
       await smartFund.setWhitelistOnly(false)
       await smartFund.deposit({ from: user1, value: 100 })
-      eq(await smartBank.addressToShares.call(user1), 2 * DECIMALS)
+
+      const balance = await smartBank.addressToShares.call(user1);
+      eq(balance.toNumber(), 2 * DECIMALS)
     })
   })
 
@@ -201,7 +206,7 @@ contract('SmartFund', function(accounts) {
       })
 
       eq(await bat.balanceOf(exchangePortal.address), 900)
-      eq(await bat.balanceOf(smartFund.address), 100)
+      eq(await bat.balanceOf(smartBank.address), 100)
 
       const user1StartBAT = (await bat.balanceOf(user1)).toNumber()
       const user2StartBAT = (await bat.balanceOf(user2)).toNumber()
@@ -209,12 +214,12 @@ contract('SmartFund', function(accounts) {
       // withdraw funds
       await smartFund.withdraw(0, { from: user1 })
 
-      eq((await bat.balanceOf(smartFund.address)).toNumber(), 50)
+      eq((await bat.balanceOf(smartBank.address)).toNumber(), 50)
       eq((await bat.balanceOf(user1)).toNumber(), user1StartBAT + 50)
 
       await smartFund.withdraw(0, { from: user2 })
 
-      eq((await bat.balanceOf(smartFund.address)).toNumber(), 0)
+      eq((await bat.balanceOf(smartBank.address)).toNumber(), 0)
       eq((await bat.balanceOf(user2)).toNumber(), user2StartBAT + 50)
     })
   })
@@ -429,7 +434,7 @@ contract('SmartFund', function(accounts) {
       })
 
       // fund should have 300 eth now
-      eq(await web3.eth.getBalance(smartFund.address), 300)
+      eq(await web3.eth.getBalance(smartBank.address), 300)
 
       // set the rate back to 1-1 and
       await exchangePortal.setRatio(1, 1)
@@ -457,7 +462,7 @@ contract('SmartFund', function(accounts) {
       // deposit in fund
       await smartFund.deposit({ from: user1, value: DECIMALS })
 
-      eq(await web3.eth.getBalance(smartFund.address), DECIMALS)
+      eq(await web3.eth.getBalance(smartBank.address), DECIMALS)
 
       await smartFund.trade(
         ETH_TOKEN_ADDRESS,
@@ -470,7 +475,7 @@ contract('SmartFund', function(accounts) {
         }
       )
 
-      eq(await web3.eth.getBalance(smartFund.address), 0)
+      eq(await web3.eth.getBalance(smartBank.address), 0)
 
       // 1 token is now worth 2 ether
       await exchangePortal.setRatio(1, 2)
@@ -489,7 +494,7 @@ contract('SmartFund', function(accounts) {
         }
       )
 
-      eq(await web3.eth.getBalance(smartFund.address), 2 * DECIMALS)
+      eq(await web3.eth.getBalance(smartBank.address), 2 * DECIMALS)
 
       // user1 now withdraws 190 ether, 90 of which are profit
       await smartFund.withdraw(0, { from: user1 })
@@ -508,7 +513,7 @@ contract('SmartFund', function(accounts) {
 
       // FM now withdraws their profit
       await smartFund.fundManagerWithdraw({ from: user1 })
-      eq((await web3.eth.getBalance(smartFund.address)).toNumber(), 0)
+      eq((await web3.eth.getBalance(smartBank.address)).toNumber(), 0)
     })
 
     it('Should properly calculate profit after another user made profit and withdrew', async function() {
@@ -520,7 +525,7 @@ contract('SmartFund', function(accounts) {
       // deposit in fund
       await smartFund.deposit({ from: user1, value: DECIMALS })
 
-      eq(await web3.eth.getBalance(smartFund.address), DECIMALS)
+      eq(await web3.eth.getBalance(smartBank.address), DECIMALS)
 
       await smartFund.trade(
         ETH_TOKEN_ADDRESS,
@@ -533,7 +538,7 @@ contract('SmartFund', function(accounts) {
         }
       )
 
-      eq(await web3.eth.getBalance(smartFund.address), 0)
+      eq(await web3.eth.getBalance(smartBank.address), 0)
 
       // 1 token is now worth 2 ether
       await exchangePortal.setRatio(1, 2)
@@ -552,7 +557,7 @@ contract('SmartFund', function(accounts) {
         }
       )
 
-      eq(await web3.eth.getBalance(smartFund.address), 2 * DECIMALS)
+      eq(await web3.eth.getBalance(smartBank.address), 2 * DECIMALS)
 
       // user1 now withdraws 190 ether, 90 of which are profit
       await smartFund.withdraw(0, { from: user1 })
@@ -561,7 +566,7 @@ contract('SmartFund', function(accounts) {
 
       // FM now withdraws their profit
       await smartFund.fundManagerWithdraw({ from: user1 })
-      eq((await web3.eth.getBalance(smartFund.address)).toNumber(), 0)
+      eq((await web3.eth.getBalance(smartBank.address)).toNumber(), 0)
 
       // now user2 deposits into the fund
       await smartFund.deposit({ from: user2, value: DECIMALS })
@@ -722,7 +727,7 @@ contract('SmartFund', function(accounts) {
       )
 
       eq(
-        (await web3.eth.getBalance(smartFund.address)).toNumber(),
+        (await web3.eth.getBalance(smartBank.address)).toNumber(),
         3 * DECIMALS
       )
 
