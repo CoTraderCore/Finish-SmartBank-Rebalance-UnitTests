@@ -3,7 +3,7 @@
 // Activate verbose mode by setting env var `export DEBUG=cot`
 require('babel-polyfill')
 const debug = require('debug')('cot')
-const BN = require('bignumber.js')
+//const BN = require('bignumber.js')
 const util = require('./util.js')
 const { DECIMALS } = util
 const SmartFund = artifacts.require('./SmartFund.sol')
@@ -405,6 +405,7 @@ contract('SmartFund', function(accounts) {
       await bat.transfer(exchangePortal.address, 1000)
       await cot.transfer(exchangePortal.address, 1000)
       await exchangePortal.pay({ from: user1, value: 1000 })
+
       // deposit in fund
       await smartFund.deposit({ from: user1, value: 100 })
 
@@ -422,8 +423,8 @@ contract('SmartFund', function(accounts) {
       await smartFund.deposit({ from: user2, value: 100 })
 
       // Make sure user1 has 2/3 of all shares and user2 has 1/3
-      eq(await smartFund.addressToShares.call(user1), DECIMALS)
-      eq(await smartFund.addressToShares.call(user2), 0.5 * DECIMALS)
+      eq(await smartBank.addressToShares.call(user1), DECIMALS)
+      eq(await smartBank.addressToShares.call(user2), 0.5 * DECIMALS)
 
       // Convert tokens back to ether, should have 300 ether afterwards
       await smartFund.trade(cot.address, 50, ETH_TOKEN_ADDRESS, 0, [0, 0, 0], {
@@ -733,6 +734,64 @@ contract('SmartFund', function(accounts) {
 
       eq((await smartFund.calculateAddressProfit(user2)).toNumber(), 0)
       eq((await smartFund.calculateAddressProfit(user3)).toNumber(), DECIMALS)
+    })
+  })
+
+  describe('Reabalance', function() {
+    beforeEach(() => deployContract(1000, 0))
+
+    it('balance BAT should increase when we do second deposit after the purchase BAT', async function() {
+      // give exchange portal contract some tokens
+      await bat.transfer(exchangePortal.address, 10 * DECIMALS)
+      const BATbalance = await smartFund.getTokenValue(bat.address)
+
+      await smartFund.deposit({ from: user1, value: 100 })
+      await smartFund.trade(
+        ETH_TOKEN_ADDRESS,
+        50,
+        bat.address,
+        0,
+        [0, 0, 0],
+        {
+          from: user1,
+        }
+      )
+      const BATbalanceBefore = await smartFund.getTokenValue(bat.address)
+      const ETHbalanceBefore = await web3.eth.getBalance(smartBank.address)
+
+      assert.notEqual(BATbalanceBefore.toNumber(), BATbalance.toNumber())
+
+      await smartFund.deposit({ from: user1, value: 100 })
+
+      const BATbalanceAfter = await smartFund.getTokenValue(bat.address)
+      const ETHbalanceAfter = await web3.eth.getBalance(smartBank.address)
+
+      assert(BATbalanceBefore.toNumber() < BATbalanceAfter.toNumber())
+      assert(ETHbalanceBefore.toNumber() < ETHbalanceAfter.toNumber())
+    })
+  })
+
+  describe('Smart Bank Access Rights', function() {
+    beforeEach(() => deployContract(1000, 0))
+
+    // only FUND can call specific function in BANK
+    // in all other cases it will error
+    it('User can not call changeAddressToShares', async function() {
+      await util.expectThrow(smartBank.changeAddressToShares(user2, 100, 1))
+    })
+
+    it('User can not call sendETH', async function() {
+      //Send some ETH to BANK
+      await web3.eth.sendTransaction({from: user1, to: smartBank.address, value: web3.toWei(2, "ether")});
+
+      await util.expectThrow(smartBank.sendETH(user1, web3.toWei(1, "ether")))
+    })
+
+    it('User can not call sendTokens', async function() {
+      // give exchange portal contract some tokens
+      await bat.transfer(smartBank.address, 10 * DECIMALS)
+
+      await util.expectThrow(smartBank.sendTokens(user1, 3 * DECIMALS, bat.address))
     })
   })
 

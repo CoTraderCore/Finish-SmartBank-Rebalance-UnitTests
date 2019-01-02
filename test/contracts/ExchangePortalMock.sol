@@ -105,8 +105,8 @@ contract ExchangePortalMock is ExchangePortalInterface {
        minConversionRate,
        walletId
    );
-
-   (_destAddress).transfer(receivedAmount);
+   // transfer tokens received to sender
+   _destination.transfer(_destAddress, _sourceAmount);
    return receivedAmount;
   }
 
