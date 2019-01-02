@@ -975,6 +975,50 @@ contract('SmartFund', function(accounts) {
     it('Not Owner of SmartFund can NOT change smartBank', async function() {
       await util.expectThrow(smartFund.changeBank(newSmartBank.address, {from:user2}))
     })
+
+
+    it('Balance in BANK increase after deposit in FUND, FUND no hold ETH', async function() {
+      const bankBalanceBefore = await web3.eth.getBalance(smartBank.address)
+
+      await smartFund.deposit({ from: user1, value: 100 })
+
+      const bankBalanceAfter = await web3.eth.getBalance(smartBank.address)
+
+      const fundBalance = await web3.eth.getBalance(smartFund.address)
+
+      assert(bankBalanceBefore.toNumber() < bankBalanceAfter.toNumber())
+
+      eq(fundBalance, 0)
+    })
+
+    it('Fund rebalance all assets in BANK, FUND no hold tokens', async function() {
+      const batBalanceInBankBefore = await bat.balanceOf(smartBank.address)
+      // give exchange portal contract some tokens
+      await bat.transfer(exchangePortal.address, 10 * DECIMALS)
+
+      await smartFund.deposit({ from: user1, value: 100 })
+
+      await smartFund.trade(
+        ETH_TOKEN_ADDRESS,
+        50,
+        bat.address,
+        0,
+        [0, 0, 0],
+        {
+          from: user1,
+        }
+      )
+
+      await smartFund.deposit({ from: user1, value: 100 })
+
+      const batBalanceInBankAfter = await bat.balanceOf(smartBank.address)
+
+      const batBalanceInFund = await bat.balanceOf(smartFund.address)
+
+      assert(batBalanceInBankBefore.toNumber() < batBalanceInBankAfter.toNumber())
+
+      eq(batBalanceInFund, 0)
+    })
   })
 
   describe('ERC20 implementation', function() {
