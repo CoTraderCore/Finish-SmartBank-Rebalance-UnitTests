@@ -26,6 +26,7 @@ contract('SmartFund', function(accounts) {
   const user3 = accounts[2]
   const platform = accounts[3]
   let smartFund, smartBank, bat, cot, exchangePortal, permittedExchanges
+  let newSmartFund, newSmartBank
   const logEvents = []
   const pastEvents = []
 
@@ -63,6 +64,28 @@ contract('SmartFund', function(accounts) {
       debug('>>', res.event, res.args)
     })
     logEvents.push(eventsWatch)
+  }
+
+  async function newFundAndBank(successFee = 0, platformFee = 0, exchangePortal, permittedExchanges){
+    // create new smartFund
+    newSmartFund = await SmartFund.new(
+      user1,
+      'testFund',
+      successFee,
+      platformFee,
+      platform,
+      exchangePortal.address,
+      permittedExchanges.address
+    )
+
+    // create new smartBank
+    newSmartBank = await SmartBank.new(
+      user1,
+      newSmartFund.address
+    )
+
+    // bind new fund with new bank
+    await newSmartFund.BankInitializer(newSmartBank.address, { from: platform })
   }
 
   after(function() {
@@ -737,6 +760,102 @@ contract('SmartFund', function(accounts) {
     })
   })
 
+  describe('SmartBank access permissions', function() {
+    beforeEach(() => deployContract(1000, 0))
+
+    // only FUND can call specific function in BANK
+    // in all other cases it will error
+    it('User can not call changeAddressToShares', async function() {
+      await util.expectThrow(smartBank.changeAddressToShares(user2, 100, 1))
+    })
+
+    it('User can not call changeAddressesNetDeposit', async function() {
+      await util.expectThrow(smartBank.changeAddressesNetDeposit(user2, 100, 1))
+    })
+
+    it('User can not call changeTotalShares', async function() {
+      await util.expectThrow(smartBank.changeTotalShares(100, 1))
+    })
+
+    it('User can not call increaseTotalEtherDeposited', async function() {
+      await util.expectThrow(smartBank.increaseTotalEtherDeposited(100))
+    })
+
+    it('User can not call increaseTotalEtherWithdrawn', async function() {
+      await util.expectThrow(smartBank.increaseTotalEtherWithdrawn(100))
+    })
+
+    it('User can not call increaseFundManagerCashedOut', async function() {
+      await util.expectThrow(smartBank.increaseFundManagerCashedOut(100))
+    })
+
+    it('User can not call sendETH', async function() {
+      //Send some ETH to BANK
+      await web3.eth.sendTransaction({from: user1, to: smartBank.address, value: web3.toWei(2, "ether")});
+
+      await util.expectThrow(smartBank.sendETH(user1, web3.toWei(1, "ether")))
+    })
+
+    it('User can not call sendTokens', async function() {
+      // give exchange portal contract some tokens
+      await bat.transfer(smartBank.address, 10 * DECIMALS)
+
+      await util.expectThrow(smartBank.sendTokens(user1, 3 * DECIMALS, bat.address))
+    })
+
+    it('User can not call tradeFromBank', async function() {
+      // give exchange portal contract some tokens
+      await bat.transfer(exchangePortal.address, 10 * DECIMALS)
+
+      await util.expectThrow(smartBank.tradeFromBank(
+        ETH_TOKEN_ADDRESS,
+        50,
+        bat.address,
+        0,
+        [0, 0, 0],
+        exchangePortal.address,
+        {
+          from: user1,
+        }
+      )
+    )
+    })
+
+    it('User can not call removeToken', async function() {
+      // give exchange portal contract some tokens
+      await bat.transfer(exchangePortal.address, 10 * DECIMALS)
+
+      // deosit and trade for add token
+      await smartFund.deposit({ from: user1, value: 100 })
+      await smartFund.trade(
+        ETH_TOKEN_ADDRESS,
+        50,
+        bat.address,
+        0,
+        [0, 0, 0],
+        {
+          from: user1,
+        }
+      )
+
+      const BATbalance = await smartFund.getTokenValue(bat.address)
+
+      // Empty the balance for remove token
+      await smartFund.trade(
+        bat.address,
+        BATbalance,
+        ETH_TOKEN_ADDRESS,
+        0,
+        [0, 0, 0],
+        {
+          from: user1,
+        }
+      )
+
+      await util.expectThrow(smartBank.removeToken(bat.address, 1))
+    })
+  })
+
   describe('Reabalance', function() {
     beforeEach(() => deployContract(1000, 0))
 
@@ -771,32 +890,96 @@ contract('SmartFund', function(accounts) {
     })
   })
 
-  describe('Smart Bank Access Rights', function() {
+
+  describe('SmartBank concept', function() {
     beforeEach(() => deployContract(1000, 0))
+    beforeEach(() => newFundAndBank(1000, 0, exchangePortal, permittedExchanges))
 
-    // only FUND can call specific function in BANK
-    // in all other cases it will error
-    it('User can not call changeAddressToShares', async function() {
-      await util.expectThrow(smartBank.changeAddressToShares(user2, 100, 1))
-    })
+    it('Owner BANK can change FUND in BANK', async function() {
+      smartBank.changeFund(newSmartFund.address, {from:user1})
+      newSmartFund.changeBank(smartBank.address, {from:user1})
 
-    it('User can not call sendETH', async function() {
-      //Send some ETH to BANK
-      await web3.eth.sendTransaction({from: user1, to: smartBank.address, value: web3.toWei(2, "ether")});
-
-      await util.expectThrow(smartBank.sendETH(user1, web3.toWei(1, "ether")))
-    })
-
-    it('User can not call sendTokens', async function() {
       // give exchange portal contract some tokens
-      await bat.transfer(smartBank.address, 10 * DECIMALS)
+      await bat.transfer(exchangePortal.address, 10 * DECIMALS)
 
-      await util.expectThrow(smartBank.sendTokens(user1, 3 * DECIMALS, bat.address))
+      // deposit and trade for test that all work good after change
+      await newSmartFund.deposit({ from: user1, value: 100 })
+
+      await newSmartFund.trade(
+        ETH_TOKEN_ADDRESS,
+        50,
+        bat.address,
+        0,
+        [0, 0, 0],
+        {
+          from: user1,
+        }
+      )
+
+      await newSmartFund.deposit({ from: user1, value: 100 })
+    })
+
+    it('Owner FUND can change BANK in FUND', async function() {
+      newSmartBank.changeFund(smartFund.address, {from:user1})
+      smartFund.changeBank(newSmartBank.address, {from:user1})
+
+      // give exchange portal contract some tokens
+      await bat.transfer(exchangePortal.address, 10 * DECIMALS)
+
+      // deposit and trade for test that all work good after change
+      await smartFund.deposit({ from: user1, value: 100 })
+
+      await smartFund.trade(
+        ETH_TOKEN_ADDRESS,
+        50,
+        bat.address,
+        0,
+        [0, 0, 0],
+        {
+          from: user1,
+        }
+      )
+
+      await smartFund.deposit({ from: user1, value: 100 })
+    })
+
+    it('FUND CAN NOT USE the new BANK, if the new BANK does not confirm the FUND', async function() {
+      //smartBank.changeFund(newSmartFund.address, {from:user1})
+      newSmartFund.changeBank(smartBank.address, {from:user1})
+
+      // give exchange portal contract some tokens
+      await bat.transfer(exchangePortal.address, 10 * DECIMALS)
+
+      // deposit and trade for test that all work good after change
+      // expectThrow now
+      await util.expectThrow(newSmartFund.deposit({ from: user1, value: 100 }))
+
+      await util.expectThrow(newSmartFund.trade(
+        ETH_TOKEN_ADDRESS,
+        50,
+        bat.address,
+        0,
+        [0, 0, 0],
+        {
+          from: user1,
+        }
+      ))
+
+      await util.expectThrow(newSmartFund.deposit({ from: user1, value: 100 }))
+    })
+
+    it('Not Onwer of SmartBank can NOT change smartFund', async function() {
+      await util.expectThrow(smartBank.changeFund(newSmartFund.address, {from:user2}))
+    })
+
+    it('Not Owner of SmartFund can NOT change smartBank', async function() {
+      await util.expectThrow(smartFund.changeBank(newSmartBank.address, {from:user2}))
     })
   })
 
   describe('ERC20 implementation', function() {
     beforeEach(() => deployContract(1000, 0))
+    beforeEach(() => newFundAndBank(1000, 0, exchangePortal, permittedExchanges))
 
     it('should be able to transfer shares to another user', async function() {
       await smartFund.deposit({ from: user2, value: 100 })
