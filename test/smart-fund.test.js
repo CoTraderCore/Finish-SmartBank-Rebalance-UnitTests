@@ -838,7 +838,7 @@ contract('SmartFund', function(accounts) {
         }
       )
 
-      const BATbalance = await smartFund.getTokenValue(bat.address)
+      const BATbalance = await smartFund.getFundTokenHolding(bat.address)
 
       // Empty the balance for remove token
       await smartFund.trade(
@@ -887,6 +887,38 @@ contract('SmartFund', function(accounts) {
 
       assert(BATbalanceBefore.toNumber() < BATbalanceAfter.toNumber())
       assert(ETHbalanceBefore.toNumber() < ETHbalanceAfter.toNumber())
+    })
+
+    // NOT FINISHED THIS  TEST!!!
+    it('Correct rebalance assets', async function() {
+      // The more the asset rate in the ETH the more it gets when rebalance
+      // in this case ETH should recive less ETH because bat more that ETH
+      // cause we bay bat for the amount of 51 eth 
+
+      // 1 bat = 1 eth
+      await exchangePortal.setRatio(1, 1)
+
+      // give exchange portal contract some tokens
+      await bat.transfer(exchangePortal.address, 10 * DECIMALS)
+
+      await smartFund.deposit({ from: user1, value: 100 })
+      await smartFund.trade(
+        ETH_TOKEN_ADDRESS,
+        51,
+        bat.address,
+        0,
+        [0, 0, 0],
+        {
+          from: user1,
+        }
+      )
+
+      await smartFund.deposit({ from: user1, value: 100 })
+
+      const balanceBat = await bat.balanceOf(smartBank.address)
+      const balanceEth = await web3.eth.getBalance(smartBank.address)
+
+      assert(balanceEth.toNumber() < balanceBat.toNumber())
     })
   })
 

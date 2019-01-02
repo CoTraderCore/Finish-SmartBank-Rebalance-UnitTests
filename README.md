@@ -18,5 +18,5 @@
 3) SmartBank access permissions
 
 # Total
-1) 61 passing
+1) 62 passing
 2) 3 failing
