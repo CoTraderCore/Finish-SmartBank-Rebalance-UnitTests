@@ -19,7 +19,3 @@
 # Total
 1) 66 passing
 
-# Add in contracts
-
-1) ISmartBank and SmartBank
-2) rebalanceToggle() for Rebalance
