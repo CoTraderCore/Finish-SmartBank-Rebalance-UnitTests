@@ -423,11 +423,14 @@ contract('SmartFund', function(accounts) {
       eq((await smartFund.calculateAddressProfit(user1)).toNumber(), 0)
     })
 
-    it('should accurately calculate profit and shares with multiple trades to and from eth', async function() {
+    it('should accurately calculate profit and shares with multiple trades to and from eth (turned off rebalance)', async function() {
       // give exchange portal contract some money
       await bat.transfer(exchangePortal.address, 1000)
       await cot.transfer(exchangePortal.address, 1000)
       await exchangePortal.pay({ from: user1, value: 1000 })
+
+      // disable rebalance
+      await smartFund.rebalanceToggle()
 
       // deposit in fund
       await smartFund.deposit({ from: user1, value: 100 })
@@ -644,12 +647,16 @@ contract('SmartFund', function(accounts) {
     })
   })
 
+
   describe('Fund Manager profit cut with deposit/withdraw scenarios', function() {
-    it('should accurately calculate shares when the manager makes a profit', async function() {
+    it('should accurately calculate shares when the manager makes a profit (turned off rebalance)', async function() {
       // deploy smartFund with 10% success fee
       await deployContract(1000, 0)
       // give exchange portal contract some money
       await bat.transfer(exchangePortal.address, 10 * DECIMALS)
+
+      // disable rebalance
+      await smartFund.rebalanceToggle()
 
       const user1StartBAT = (await bat.balanceOf(user1)).toNumber()
 
@@ -706,12 +713,15 @@ contract('SmartFund', function(accounts) {
       eq((await bat.balanceOf(user2)).toNumber(), 0.5 * DECIMALS)
     })
 
-    it('should accurately calculate shares when FM makes a loss then breaks even', async function() {
+    it('should accurately calculate shares when FM makes a loss then breaks even (turned off rebalance)', async function() {
       // deploy smartFund with 10% success fee
       await deployContract(1000, 0)
       // give exchange portal contract some money
       await bat.transfer(exchangePortal.address, 10 * DECIMALS)
       await exchangePortal.pay({ from: user3, value: 3 * DECIMALS })
+
+      // disable rebalance
+      await smartFund.rebalanceToggle()
 
       // deposit in fund
       await smartFund.deposit({ from: user2, value: DECIMALS })
@@ -733,8 +743,8 @@ contract('SmartFund', function(accounts) {
       // user3 deposits, should have 2/3 of shares now
       await smartFund.deposit({ from: user3, value: DECIMALS })
 
-      eq(await smartFund.addressToShares.call(user2), DECIMALS)
-      eq(await smartFund.addressToShares.call(user3), 2 * DECIMALS)
+      eq(await smartBank.addressToShares.call(user2), DECIMALS)
+      eq(await smartBank.addressToShares.call(user3), 2 * DECIMALS)
 
       // 1 token is now worth 2 ether, funds value is 3 ether
       await exchangePortal.setRatio(1, 2)
@@ -889,11 +899,10 @@ contract('SmartFund', function(accounts) {
       assert(ETHbalanceBefore.toNumber() < ETHbalanceAfter.toNumber())
     })
 
-    // NOT FINISHED THIS  TEST!!!
     it('Correct rebalance assets', async function() {
       // The more the asset rate in the ETH the more it gets when rebalance
       // in this case ETH should recive less ETH because bat more that ETH
-      // cause we bay bat for the amount of 51 eth 
+      // cause we bay bat for the amount of 51 eth
 
       // 1 bat = 1 eth
       await exchangePortal.setRatio(1, 1)
@@ -919,6 +928,10 @@ contract('SmartFund', function(accounts) {
       const balanceEth = await web3.eth.getBalance(smartBank.address)
 
       assert(balanceEth.toNumber() < balanceBat.toNumber())
+    })
+
+    it('Not owner fund can not call rebalanceToggle()', async function() {
+      await util.expectThrow(smartFund.rebalanceToggle({from:user2}))
     })
   })
 

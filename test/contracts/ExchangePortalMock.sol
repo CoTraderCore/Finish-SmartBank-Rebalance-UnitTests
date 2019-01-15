@@ -75,7 +75,7 @@ contract ExchangePortalMock is ExchangePortalInterface {
     return receivedAmount;
   }
 
-  // Imitation NOT CORRECT WORK!!!!
+  // Imitation
   function tradeForDest(
     ERC20 _source,
     uint256 _sourceAmount,
