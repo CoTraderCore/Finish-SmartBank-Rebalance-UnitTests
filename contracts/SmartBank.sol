@@ -54,6 +54,8 @@ contract SmartBank is Ownable{
   // The earnings the fund manager has already cashed out
   uint256 public fundManagerCashedOut = 0;
 
+  event SmartFundWasChanged(address indexed smartFundAddress, address indexed smartBankAddress);
+
 
 
   /**
@@ -94,6 +96,8 @@ contract SmartBank is Ownable{
     fund = _fund;
 
     isFundSet = true;
+
+    emit SmartFundWasChanged(_fund, address(this));
   }
 
 

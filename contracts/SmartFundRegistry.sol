@@ -25,6 +25,7 @@ contract SmartFundRegistry is Ownable {
   uint256 public maximumSuccessFee = 3000;
 
   event SmartFundAdded(address indexed smartFundAddress, address indexed owner);
+  event SmartBankAdded(address indexed smartBankAddress, address indexed owner);
 
   /**
   * @dev contructor
@@ -77,6 +78,7 @@ contract SmartFundRegistry is Ownable {
     smartFund.BankInitializer(address(smartBank));
 
     emit SmartFundAdded(address(smartFund), owner);
+    emit SmartBankAdded(address(smartBank), owner);
   }
 
   function totalSmartFunds() public view returns (uint256) {

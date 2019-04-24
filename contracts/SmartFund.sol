@@ -67,7 +67,7 @@ contract SmartFund is SmartFundInterface, Ownable, ERC20 {
   bool public onlyWhitelist = false;
 
   // allow owner of fund disable/enable rebalance
-  bool public isRebalance = true;
+  bool public isRebalance = false;
 
   // Mapping of addresses that are approved to deposit if the manager only want's specific
   // addresses to be able to invest in their fund
@@ -79,6 +79,7 @@ contract SmartFund is SmartFundInterface, Ownable, ERC20 {
   event Withdraw(address indexed user, uint256 sharesRemoved, uint256 totalShares);
   event Trade(address src, uint256 srcAmount, address dest, uint256 destReceived);
   event SmartFundCreated(address indexed owner);
+  event SmartBankWasChanged(address indexed smartBankAddress, address indexed smartFundAddress);
 
   /**
   * @dev constructor
@@ -142,6 +143,7 @@ contract SmartFund is SmartFundInterface, Ownable, ERC20 {
     Ibank = ISmartBank(_bank);
 
     isBankSet = true;
+    emit SmartBankWasChanged(_bank, address(this));
   }
 
   /**
